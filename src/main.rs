@@ -1,39 +1,14 @@
 use reqwest::header::{CONTENT_TYPE, ORIGIN, REFERER};
 use reqwest::Error;
-use serde::{Deserialize, Serialize};
-use std::format;
-use futures_util::{future, pin_mut, StreamExt};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio_tungstenite::{connect_async, tungstenite::protocol::Message, tungstenite::handshake::client::generate_key};
-use http::request::Request;
+use std::sync::Arc;
+use tokio::time::sleep;
+use tokio_tungstenite::tungstenite::protocol::Message;
 
-#[derive(Deserialize, Debug, Clone)]
-struct CreateRoomResponse {
-    id: String,
-}
+mod infrastructure;
+use infrastructure::client::synctube_client::SyncTubeClient;
+use infrastructure::client::synctube_client::SyncTubeClientTrait;
 
-#[derive(Serialize, Debug)]
-struct JoinRoomRequest {
-    id: String,
-    preferences: RoomPreferences,
-}
-
-#[derive(Serialize, Debug)]
-struct RoomPreferences {
-    user: Option<String>,
-    player: PlayerPreferences,
-    consent: bool,
-}
-
-#[derive(Serialize, Debug)]
-struct PlayerPreferences {
-    soundcloud: SoundcloudPreferences,
-}
-
-#[derive(Serialize, Debug)]
-struct SoundcloudPreferences {
-    volume: f32,
-}
+use infrastructure::synctube_client::model::sync_tube_model::{ CreateRoomResponse, JoinRoomRequest, RoomPreferences, PlayerPreferences, SoundcloudPreferences };
 
 struct Room {
     id: String,
@@ -46,51 +21,16 @@ async fn main() {
     let room_id: &str = &create_room_response.id;
     let room_token: &str = &create_room_response.token;
 
-    let connect_addr = format!("wss://sync-tube.de/ws/{}/ewB9AA==", room_id);
-
-    let request = Request::builder()
-        .uri(&connect_addr)
-        .method("GET")
-        .header("Host", "sync-tube.de")
-        .header("Origin", "https://sync-tube.de/")
-        .header("Cookie", room_token)
-        .header("Sec-WebSocket-Version", "13")
-        .header("Sec-WebSocket-Key", generate_key())
-        .header("Connection", "Upgrade")
-        .header("Upgrade", "websocket")
-        .body(())
-        .unwrap();
-
-    let (stdin_tx, stdin_rx) = futures_channel::mpsc::unbounded();
-    tokio::spawn(read_stdin(stdin_tx)); 
-
-    let (ws_stream, _) = connect_async(request).await.expect("Failed to connect");
-    println!("WebSocket handshake has been successfully completed");
-
-    let (write, read) = ws_stream.split();
-
-    let stdin_to_ws = stdin_rx.map(Ok).forward(write);
-    let ws_to_stdout = {
-        read.for_each(|message| async {
-            let data = message.unwrap().into_data();
-            tokio::io::stdout().write_all(&data).await.unwrap();
-        })
-    };
-
-    pin_mut!(stdin_to_ws, ws_to_stdout);
-    future::select(stdin_to_ws, ws_to_stdout).await;
-}
-
-async fn read_stdin(tx: futures_channel::mpsc::UnboundedSender<Message>) {
-    let mut stdin = tokio::io::stdin();
+    let client = Arc::new(SyncTubeClient::new(room_id, room_token));
+    client.connect().await.unwrap();
+    client.rename("Rust SyncTube Bot").await.unwrap();
+    sleep(std::time::Duration::from_secs(5)).await;
     loop {
-        let mut buf = vec![0; 1024];
-        let n = match stdin.read(&mut buf).await {
-            Err(_) | Ok(0) => break,
-            Ok(n) => n,
-        };
-        buf.truncate(n);
-        tx.unbounded_send(Message::binary(buf)).unwrap();
+        client
+            .add_video("https://www.youtube.com/watch?v=QH2-TGUlwu4")
+            .await
+            .unwrap();
+        sleep(std::time::Duration::from_secs(20)).await;
     }
 }
 
