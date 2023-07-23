@@ -1,7 +1,6 @@
 use reqwest::header::{CONTENT_TYPE, ORIGIN, REFERER};
 use reqwest::Error;
 use std::sync::Arc;
-use tokio::time::sleep;
 use tokio_tungstenite::tungstenite::protocol::Message;
 
 mod infrastructure;
@@ -17,6 +16,32 @@ struct Room {
 
 #[tokio::main]
 async fn main() {
+    let num_threads = 5;
+    let rooms_per_thread = 100;
+
+    let mut join_handles = vec![];
+
+    for _ in 0..num_threads {
+        let join_handle = tokio::spawn(create_rooms_task(rooms_per_thread));
+        join_handles.push(join_handle);
+    }
+
+    // Wait for all threads to finish
+    for join_handle in join_handles {
+        join_handle.await.unwrap();
+    }
+}
+
+async fn create_rooms_task(num_rooms: usize) {
+    for _ in 0..num_rooms {
+        match do_stuff_on_synctube().await {
+            Ok(room_url) => println!("Room created: {}", room_url),
+            Err(err) => eprintln!("Error creating room: {}", err),
+        }
+    }
+}
+
+async fn do_stuff_on_synctube() -> Result<String, String> {
     let create_room_response: Room = create_room().await.unwrap();
     let room_id: &str = &create_room_response.id;
     let room_token: &str = &create_room_response.token;
@@ -24,14 +49,15 @@ async fn main() {
     let client = Arc::new(SyncTubeClient::new(room_id, room_token));
     client.connect().await.unwrap();
     client.rename("Rust SyncTube Bot").await.unwrap();
-    sleep(std::time::Duration::from_secs(5)).await;
-    loop {
+    for _ in 0..9 {
         client
             .add_video("https://www.youtube.com/watch?v=QH2-TGUlwu4")
             .await
             .unwrap();
-        sleep(std::time::Duration::from_secs(20)).await;
     }
+    client.disconnect().await.unwrap();
+
+    Ok(format!("https://sync-tube.de/room/{}", room_id.to_string()))
 }
 
 async fn create_room() -> Result<Room, Error> {

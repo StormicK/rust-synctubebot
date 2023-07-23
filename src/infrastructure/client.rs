@@ -29,6 +29,7 @@ pub mod synctube_client {
     pub struct SyncTubeClient {
         room_id: String,
         room_token: String,
+        disconnect: bool,
         write: Arc<Mutex<Option<SplitSink<WebSocketStream<MaybeTlsStream<TcpStream>>, Message>>>>,
         read: Arc<Mutex<Option<SplitStream<WebSocketStream<MaybeTlsStream<TcpStream>>>>>>,
     }
@@ -39,6 +40,7 @@ pub mod synctube_client {
             SyncTubeClient {
                 room_id: room_id.to_string(),
                 room_token: room_token.to_string(),
+                disconnect: false,
                 write: Arc::new(Mutex::new(None)),
                 read: Arc::new(Mutex::new(None)),
             }
@@ -66,17 +68,21 @@ pub mod synctube_client {
 
         async fn listen(self: Arc<Self>) -> Result<(), String> {
             // make it retry until its able to obtain the lock
-            let mut read = self.read.lock().await;
-            while read.is_none() {
-                read = self.read.lock().await;
+            let mut read_mutex = self.read.lock().await;
+            while read_mutex.is_none() {
+                read_mutex = self.read.lock().await;
             }
 
-            let mut read = read.take().unwrap();
+            let read = read_mutex.as_mut().unwrap();
             while let Some(msg) = read.next().await {
                 let msg = msg.unwrap();
                 println!("Received a message: {:?}", msg);
+                if self.disconnect {
+                    break;
+                }
             }
 
+            self.disconnect().await?;
             Ok(())
         }
     }
@@ -105,6 +111,7 @@ pub mod synctube_client {
 
             // split the ws_stream into read and write and put it into the mutexes
             let (write, read) = ws_stream.split();
+            
             *self.write.lock().await = Some(write);
             *self.read.lock().await = Some(read);
 
