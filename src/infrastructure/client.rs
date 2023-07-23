@@ -50,7 +50,7 @@ pub mod synctube_client {
             let mut write = self.write.lock().await;
 
             while write.is_none() {
-                println!("write is none");
+                // println!("write is none");
                 write = self.write.lock().await;
             }
 
@@ -58,7 +58,7 @@ pub mod synctube_client {
             let write = write.as_mut().unwrap();
 
             let msg = Message::Text(message.to_string());
-            println!("Sending message: {:?}", msg);
+            // println!("Sending message: {:?}", msg);
 
             match write.send(msg).await {
                 Ok(_) => Ok(()),
@@ -76,7 +76,7 @@ pub mod synctube_client {
             let read = read_mutex.as_mut().unwrap();
             while let Some(msg) = read.next().await {
                 let msg = msg.unwrap();
-                println!("Received a message: {:?}", msg);
+                // println!("Received a message: {:?}", msg);
                 if self.disconnect {
                     break;
                 }
@@ -91,8 +91,8 @@ pub mod synctube_client {
     impl SyncTubeClientTrait for Arc<SyncTubeClient> {
         // make empty impls
         async fn connect(&self) -> Result<(), String> {
-            println!("Connecting to SyncTube server...");
-            println!("{}", &self.room_id);
+            // println!("Connecting to SyncTube server...");
+            // println!("{}", &self.room_id);
             let request = Request::builder()
                 .uri(format!("wss://sync-tube.de/ws/{}/ewB9AA==", &self.room_id))
                 .method("GET")
@@ -107,7 +107,7 @@ pub mod synctube_client {
                 .unwrap();
 
             let (ws_stream, _) = connect_async(request).await.expect("Failed to connect");
-            println!("WebSocket handshake has been successfully completed");
+            // println!("WebSocket handshake has been successfully completed");
 
             // split the ws_stream into read and write and put it into the mutexes
             let (write, read) = ws_stream.split();
@@ -135,7 +135,7 @@ pub mod synctube_client {
 
         async fn add_video(&self, video_id: &str) -> Result<(), String> {
             let event = format!("[30, {{\"src\": \"{}\"}}, 1688789078114]", video_id);
-            println!("Sending add_video event: {}", &event);
+            // println!("Sending add_video event: {}", &event);
             self.send_message(&event).await?;
 
             Ok(())
@@ -143,7 +143,7 @@ pub mod synctube_client {
         
         async fn rename(&self, name: &str) -> Result<(), String> {
             let event = format!("[12, \"{}\", 1688792619084]", name);
-            println!("Sending rename event: {}", &event);
+            // println!("Sending rename event: {}", &event);
             self.send_message(&event).await?;
 
             Ok(())
