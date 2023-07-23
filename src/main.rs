@@ -63,20 +63,20 @@ async fn do_stuff_on_synctube() -> Result<String, String> {
 async fn create_room() -> Result<Room, Error> {
     let client: reqwest::Client = reqwest::Client::new();
 
-    println!("Creating room...");
+    // println!("Creating room...");
     let create_room_url: &str = "https://sync-tube.de/api/create";
     let response: reqwest::Response = client.post(create_room_url).send().await?;
 
-    match response.status().is_success() {
-        true => println!("Room created successfully!"),
-        false => panic!("Room creation failed!"),
-    }
+    // match response.status().is_success() {
+    //     true => println!("Room created successfully!"),
+    //     false => panic!("Room creation failed!"),
+    // }
 
     let create_room_response: CreateRoomResponse = response.json().await?;
     let id: &str = &create_room_response.id;
-    println!("Room created: {}", id);
+    // println!("Room created: {}", id);
 
-    println!("Joining room...");
+    // println!("Joining room...");
 
     let join_room_url: &str = "https://sync-tube.de/api/join";
     let join_room_request: JoinRoomRequest = JoinRoomRequest {
@@ -98,10 +98,10 @@ async fn create_room() -> Result<Room, Error> {
         .send()
         .await?;
 
-    match response.status().is_success() {
-        true => println!("Joined room successfully!"),
-        false => panic!("Joining room failed!"),
-    }
+    // match response.status().is_success() {
+    //     true => println!("Joined room successfully!"),
+    //     false => panic!("Joining room failed!"),
+    // }
 
     let s = response
         .headers()
